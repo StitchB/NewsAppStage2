@@ -5,11 +5,15 @@ import android.app.LoaderManager.LoaderCallbacks;
 import android.content.Context;
 import android.content.Intent;
 import android.content.Loader;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -23,8 +27,12 @@ public class NewsActivity extends AppCompatActivity {
     /**
      * URL for news data from the dataset
      */
-    private static final String REQUEST_URL =
-            "http://content.guardianapis.com/search?show-fields=thumbnail&show-tags=contributor&q=future&order-by=newest&from-date=2017-05-01&api-key=44053436-2b60-4f53-888b-561a139b173c";
+    private static final String REQUEST_URL = "http://content.guardianapis.com/search";
+
+    /**
+     * Guardian API key
+     */
+    private static final String API_KEY = "44053436-2b60-4f53-888b-561a139b173c";
 
     /**
      * Constant value for the news loader ID. We can choose any integer.
@@ -48,11 +56,41 @@ public class NewsActivity extends AppCompatActivity {
     //News loader
     private final LoaderCallbacks<List<News>> newsLoader
             = new LoaderCallbacks<List<News>>() {
+
         @Override
+        // onCreateLoader instantiates and returns a new Loader for the given ID
         public Loader<List<News>> onCreateLoader(int i, Bundle bundle) {
-            // Create a new loader for the given URL
-            return new NewsLoader(currentContext, REQUEST_URL);
+
+            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(currentContext);
+
+            //getString retrieves a String value from the preferences. The second parameter is the default value for this preference.
+            String searchPharse = sharedPrefs.getString(
+                    getString(R.string.settings_title_key),
+                    getString(R.string.settings_title_default));
+
+            String orderBy = sharedPrefs.getString(
+                    getString(R.string.settings_order_by_key),
+                    getString(R.string.settings_order_by_default));
+
+            //parse breaks apart the URI string that's passed into its parameter
+            Uri baseUri = Uri.parse(REQUEST_URL);
+
+            //buildUpon prepares the baseUri that we just parsed so we can add query parameters to it
+            Uri.Builder uriBuilder = baseUri.buildUpon();
+
+            //Append query parameter and its value
+            if(searchPharse != "") {
+                uriBuilder.appendQueryParameter("q", searchPharse);
+            }
+            uriBuilder.appendQueryParameter("show-fields", "thumbnail");
+            uriBuilder.appendQueryParameter("show-tags", "contributor");
+            uriBuilder.appendQueryParameter("order-by", orderBy);
+            uriBuilder.appendQueryParameter("api-key", API_KEY);
+
+            //Create a new loader for the given completed URL
+            return new NewsLoader(currentContext, uriBuilder.toString());
         }
+
 
         @Override
         public void onLoadFinished(Loader<List<News>> loader, List<News> news) {
@@ -142,5 +180,24 @@ public class NewsActivity extends AppCompatActivity {
             // Update empty state with no connection error message
             emptyStateTextView.setText(R.string.no_internet_connection);
         }
+    }
+
+    @Override
+    // This method initialize the contents of the Activity's options menu.
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the Options Menu we specified in XML
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            Intent settingsIntent = new Intent(this, SettingsActivity.class);
+            startActivity(settingsIntent);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }
